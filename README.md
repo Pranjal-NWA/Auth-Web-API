@@ -6,7 +6,7 @@ Install these before starting — check each with the command shown:
 
 | Tool | Check with | Get it from |
 |---|---|---|
-| .NET 10 SDK | `dotnet --version` (should show `10.x`) | https://dotnet.microsoft.com/download |
+| .NET 8 SDK | `dotnet --version` (should show `8.x`) | https://dotnet.microsoft.com/download |
 | PostgreSQL | running locally, or a connection string to a remote instance | https://www.postgresql.org/download |
 | EF Core CLI tool | `dotnet ef --version` | install below if missing |
 
