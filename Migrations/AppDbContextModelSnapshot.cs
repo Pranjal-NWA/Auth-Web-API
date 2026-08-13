@@ -180,7 +180,9 @@ namespace WebAPI.Migrations
                         .HasColumnType("character varying(255)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<DateTime?>("LastLogin")
                         .HasColumnType("timestamp with time zone");

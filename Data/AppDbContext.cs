@@ -12,7 +12,13 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
- 
+
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ApplicationUser>()
+            .Property(u => u.IsActive)
+            .HasDefaultValue(true);
+
+
     }
 }
