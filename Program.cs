@@ -36,8 +36,8 @@ builder.Services
     {
         options.Password.RequiredLength = 8;
         options.Password.RequireDigit = true;
-        options.Password.RequireUppercase = false;
-        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = true;
         options.User.RequireUniqueEmail = true;
 
 
