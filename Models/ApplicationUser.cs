@@ -15,4 +15,6 @@ public class ApplicationUser : IdentityUser<Guid>
 
 
     public DateTime? LastLogin { get; set; }
+
+    public List<RefreshToken> RefreshTokens { get; set; } = new();
 }
