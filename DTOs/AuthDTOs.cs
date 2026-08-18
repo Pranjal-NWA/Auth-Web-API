@@ -32,3 +32,21 @@ public class UserResponse
     public string Role { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
 }
+
+public class ForgotPasswordRequest
+{
+    [Required, EmailAddress]
+    public string Email { get; set; } = string.Empty;
+}
+
+public class ResetPasswordRequest
+{
+    [Required, EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    public string Token { get; set; } = string.Empty;
+
+    [Required, MaxLength(128)]
+    public string NewPassword { get; set; } = string.Empty;
+}

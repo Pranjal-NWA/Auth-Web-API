@@ -30,7 +30,7 @@ public class AuthController : ControllerBase
             Email = user.Email!,
             FullName = user.FullName,
             IsVerified = user.EmailConfirmed,
-            Role=await _authService.GetUserRoleAsync(user),
+            Role = await _authService.GetUserRoleAsync(user),
             CreatedAt = user.CreatedAt,
         });
     }
@@ -48,7 +48,7 @@ public class AuthController : ControllerBase
             Email = user.Email!,
             FullName = user.FullName,
             IsVerified = user.EmailConfirmed,
-            Role=await _authService.GetUserRoleAsync(user),
+            Role = await _authService.GetUserRoleAsync(user),
             CreatedAt = user.CreatedAt,
         });
     }
@@ -73,6 +73,36 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting("login")]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)
+    {
+        var linkTemplate = $"{_config["Frontend:BaseUrl"]}/reset-password?email={{email}}&token={{token}}";
+        await _authService.ForgotPasswordAsync(request.Email, linkTemplate);
+
+        // Always 204 regardless of whether the account exists - same
+        // enumeration-prevention reasoning as resend-confirmation above.
+        return NoContent();
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
+    {
+        await _authService.ResetPasswordAsync(request);
+        return NoContent();
+    }
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        Request.Cookies.TryGetValue("refresh_token", out var rawToken);
+        await _authService.LogoutAsync(rawToken);
+
+        Response.Cookies.Delete("access_token", new CookieOptions { Path = "/" });
+        Response.Cookies.Delete("refresh_token", new CookieOptions { Path = "/" });
+
+        return NoContent();
+    }
+
     private void SetAuthCookies(string accessToken, string refreshToken)
     {
         var cookieSecure = _config.GetValue<bool>("CookieSecure");
@@ -89,13 +119,19 @@ public class AuthController : ControllerBase
 
         Response.Cookies.Append("access_token", accessToken, new CookieOptions
         {
-            HttpOnly = common.HttpOnly, Secure = common.Secure, SameSite = common.SameSite, Path = common.Path,
+            HttpOnly = common.HttpOnly,
+            Secure = common.Secure,
+            SameSite = common.SameSite,
+            Path = common.Path,
             MaxAge = TimeSpan.FromSeconds(accessSeconds),
         });
 
         Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
         {
-            HttpOnly = common.HttpOnly, Secure = common.Secure, SameSite = common.SameSite, Path = common.Path,
+            HttpOnly = common.HttpOnly,
+            Secure = common.Secure,
+            SameSite = common.SameSite,
+            Path = common.Path,
             MaxAge = TimeSpan.FromDays(refreshDays),
         });
     }

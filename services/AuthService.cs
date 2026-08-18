@@ -14,17 +14,20 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly AppDbContext _db;
     private readonly ILogger<AuthService> _logger;
+    private readonly IEmailSender _emailSender;
 
     public AuthService(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
     ITokenService tokenService,
+    IEmailSender emailSender,
     AppDbContext db,
     ILogger<AuthService> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _tokenService = tokenService;
+        _emailSender = emailSender;
         _db = db;
         _logger = logger;
     }
@@ -159,6 +162,48 @@ public class AuthService : IAuthService
         await _db.SaveChangesAsync();
 
         return (user, accessToken, newRawRefresh);
+    }
+    public async Task LogoutAsync(string? rawRefreshToken)
+    {
+
+        if (string.IsNullOrEmpty(rawRefreshToken)) return;
+
+        var tokenHash = _tokenService.HashRefreshToken(rawRefreshToken);
+        var tokenRow = await _db.RefreshTokens.FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
+        if (tokenRow is not null)
+        {
+            tokenRow.IsRevoked = true;
+            await _db.SaveChangesAsync();
+        }
+    }
+
+    public async Task ForgotPasswordAsync(string email, string linkTemplate)
+    {
+        var user = await _userManager.FindByEmailAsync(email.Trim().ToLowerInvariant());
+        
+        if (user is null) return;
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+        var link = linkTemplate
+            .Replace("{email}", Uri.EscapeDataString(user.Email!))
+            .Replace("{token}", Uri.EscapeDataString(token));
+
+        await _emailSender.SendPasswordResetAsync(user.Email!, link);
+        _logger.LogInformation("Sent password reset email to user {UserId} where token is {Token}", user.Id, token);
+    }
+
+    public async Task ResetPasswordAsync(ResetPasswordRequest request)
+    {
+        var user = await _userManager.FindByEmailAsync(request.Email.Trim().ToLowerInvariant());
+        if (user is null)
+            throw new ValidationApiException(new[] { "Invalid or expired reset link" });
+
+        var result = await _userManager.ResetPasswordAsync(user, request.Token, request.NewPassword);
+        if (!result.Succeeded)
+            throw new ValidationApiException(result.Errors.Select(e => e.Description));
+
+        _logger.LogInformation("User {UserId} reset their password", user.Id);
     }
 
 }
