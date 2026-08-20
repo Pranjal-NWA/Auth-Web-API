@@ -54,6 +54,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [EnableRateLimiting("refresh")]
     public async Task<ActionResult<UserResponse>> Refresh()
     {
         Request.Cookies.TryGetValue("refresh_token", out var rawToken);

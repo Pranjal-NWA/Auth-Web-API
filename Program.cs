@@ -93,6 +93,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+var frontendOrigin = builder.Configuration["Cors:FrontendOrigin"] ?? "http://localhost:5173";
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins(frontendOrigin)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -111,6 +123,14 @@ builder.Services.AddRateLimiter(options =>
             PermitLimit = 10,
             Window = TimeSpan.FromMinutes(1),
         }));
+        
+    options.AddPolicy("refresh", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+    factory: _ => new FixedWindowRateLimiterOptions
+    {
+        PermitLimit = 20,
+        Window = TimeSpan.FromMinutes(1),
+    }));
 
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
@@ -132,12 +152,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseExceptionHandler();   
-app.UseStatusCodePages();   
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 app.UseHttpsRedirection();
+app.UseCors();
 app.UseRateLimiter();
-app.UseAuthentication();     
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

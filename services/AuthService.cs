@@ -109,6 +109,7 @@ public class AuthService : IAuthService
             UserId = user.Id,
             TokenHash = refreshHash,
             ExpiresAt = expiresAt,
+            SecurityStamp = user.SecurityStamp!,
         });
 
         user.LastLogin = DateTime.UtcNow;
@@ -127,9 +128,23 @@ public class AuthService : IAuthService
             .Include(rt => rt.User)
             .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
 
-        if (tokenRow is null || tokenRow.IsRevoked || tokenRow.ExpiresAt < DateTime.UtcNow)
+        if (tokenRow is null || tokenRow.ExpiresAt < DateTime.UtcNow)
         {
-            _logger.LogInformation("Refresh rejected - token invalid, revoked, or expired");
+            _logger.LogInformation("Refresh rejected - token not found or expired");
+            throw new UnauthorizedApiException("Refresh token invalid or expired");
+        }
+
+        if (tokenRow.IsRevoked)
+        {
+            // A revoked token being presented Kill every
+            // active session for this user, not just this request.
+            var revokedCount = await RevokeAllSessionsAsync(tokenRow.UserId);
+            await _db.SaveChangesAsync();
+            _logger.LogWarning(
+                "Reuse of revoked refresh token detected for user_id={UserId} - revoked {Count} active session(s).",
+                tokenRow.UserId, revokedCount);
+
+            // Same generic message as any other invalid token
             throw new UnauthorizedApiException("Refresh token invalid or expired");
         }
 
@@ -141,11 +156,25 @@ public class AuthService : IAuthService
             throw new UnauthorizedApiException("User not found or inactive");
         }
 
-
         if (await _userManager.IsLockedOutAsync(user))
         {
             _logger.LogWarning("Refresh rejected - user {UserId} is locked out", user.Id);
             throw new UnauthorizedApiException("Account is currently locked");
+        }
+
+        // A password change rotates Identity's SecurityStamp. If this token
+        // was issued under an older stamp, it belongs to a session that
+        // predates the password change and must not be renewable - otherwise
+        // changing your password wouldn't actually invalidate a stolen
+        // refresh token.
+        if (tokenRow.SecurityStamp != user.SecurityStamp)
+        {
+            var revokedCount = await RevokeAllSessionsAsync(user.Id);
+            await _db.SaveChangesAsync();
+            _logger.LogInformation(
+                "Refresh rejected - SecurityStamp mismatch for user {UserId}, revoked {Count} stale session(s) after password change",
+                user.Id, revokedCount);
+            throw new UnauthorizedApiException("Refresh token invalid or expired");
         }
 
         tokenRow.IsRevoked = true;
@@ -158,10 +187,24 @@ public class AuthService : IAuthService
             UserId = user.Id,
             TokenHash = newRefreshHash,
             ExpiresAt = newExpiresAt,
+            SecurityStamp = user.SecurityStamp!,
         });
         await _db.SaveChangesAsync();
 
         return (user, accessToken, newRawRefresh);
+    }
+
+    private async Task<int> RevokeAllSessionsAsync(Guid userId)
+    {
+        var now = DateTime.UtcNow;
+        var activeSessions = await _db.RefreshTokens
+            .Where(rt => rt.UserId == userId && !rt.IsRevoked && rt.ExpiresAt > now)
+            .ToListAsync();
+
+        foreach (var session in activeSessions)
+            session.IsRevoked = true;
+
+        return activeSessions.Count;
     }
     public async Task LogoutAsync(string? rawRefreshToken)
     {
@@ -180,7 +223,7 @@ public class AuthService : IAuthService
     public async Task ForgotPasswordAsync(string email, string linkTemplate)
     {
         var user = await _userManager.FindByEmailAsync(email.Trim().ToLowerInvariant());
-        
+
         if (user is null) return;
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
