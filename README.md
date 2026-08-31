@@ -117,3 +117,4 @@ For the lockout smoke test:
 ```bash
 py scripts/brute_force_lockout.py
 ```
+<img width="1096" height="326" alt="image" src="https://github.com/user-attachments/assets/9cdd9951-3551-433a-b18e-7cb5ca6501d4" />
