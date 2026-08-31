@@ -110,6 +110,8 @@ dotnet test --collect:"XPlat Code Coverage" --settings coverage.runsettings
 reportgenerator -reports:"TestResults/*/coverage.cobertura.xml" -targetdir:"CoverageReport" -reporttypes:Html
 ``````
 
+<img width="1880" height="982" alt="CoverageReport" src="https://github.com/user-attachments/assets/bb8eb4fd-f747-4832-9109-7e401d09ae32" />
+
 For the lockout smoke test:
 
 ```bash
