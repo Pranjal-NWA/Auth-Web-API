@@ -72,12 +72,46 @@ dotnet tool install --global dotnet-ef
 
 ## Day-to-day development
 
-Once set up, you don't need to repeat steps 1–5 every time. Just:
-```
-cd WebApi
+Once the initial setup is complete, you do not need to repeat the database and dependency setup every time.
+
+Run the API with:
+
+```bash
+cd "Web API"
 dotnet run
 ```
-Or, to have it automatically restart whenever you save a code change:
+
+Or use the HTTPS profile:
+
+```bash
+dotnet run --launch-profile https
 ```
+
+To automatically restart the API whenever code changes:
+
+```bash
 dotnet watch run
+```
+
+For day-to-day testing:
+
+```bash
+cd WebAPI.Tests
+dotnet test
+```
+
+For coverage:
+
+```bash
+dotnet test --collect:"XPlat Code Coverage" --settings coverage.runsettings
+```
+
+````report
+reportgenerator -reports:"TestResults/*/coverage.cobertura.xml" -targetdir:"CoverageReport" -reporttypes:Html
+``````
+
+For the lockout smoke test:
+
+```bash
+py scripts/brute_force_lockout.py
 ```

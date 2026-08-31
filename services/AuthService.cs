@@ -233,7 +233,6 @@ public class AuthService : IAuthService
             .Replace("{token}", Uri.EscapeDataString(token));
 
         await _emailSender.SendPasswordResetAsync(user.Email!, link);
-        _logger.LogInformation("Sent password reset email to user {UserId} where token is {Token}", user.Id, token);
     }
 
     public async Task ResetPasswordAsync(ResetPasswordRequest request)

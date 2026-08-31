@@ -12,7 +12,9 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-if (!builder.Environment.IsDevelopment())
+builder.Configuration.AddUserSecrets<Program>();
+
+if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
 {
     using var secretsClient = new Amazon.SecretsManager.AmazonSecretsManagerClient();
     var secretName = builder.Configuration["AWS:SecretName"] ?? "authservice/prod";
@@ -78,17 +80,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ClockSkew = TimeSpan.Zero,
         };
 
-        options.Events = new JwtBearerEvents
+       options.Events = new JwtBearerEvents
+{
+    OnMessageReceived = context =>
+    {
+        if (context.Request.Cookies.TryGetValue("access_token", out var token))
         {
-            OnMessageReceived = context =>
-            {
-                if (context.Request.Cookies.TryGetValue("access_token", out var token))
-                {
-                    context.Token = token;
-                }
-                return Task.CompletedTask;
-            },
-        };
+            context.Token = token;
+        }
+        return Task.CompletedTask;
+    },
+};
     });
 
 builder.Services.AddAuthorization();
@@ -106,34 +108,37 @@ builder.Services.AddCors(options =>
 });
 
 
-builder.Services.AddRateLimiter(options =>
+if (!builder.Environment.IsEnvironment("Testing"))
 {
-    options.AddPolicy("signup", httpContext => RateLimitPartition.GetFixedWindowLimiter(
-        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        factory: _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = 5,
-            Window = TimeSpan.FromMinutes(1),
-        }));
-
-    options.AddPolicy("login", httpContext => RateLimitPartition.GetFixedWindowLimiter(
-        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        factory: _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = 10,
-            Window = TimeSpan.FromMinutes(1),
-        }));
-        
-    options.AddPolicy("refresh", httpContext => RateLimitPartition.GetFixedWindowLimiter(
-    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-    factory: _ => new FixedWindowRateLimiterOptions
+    builder.Services.AddRateLimiter(options =>
     {
-        PermitLimit = 20,
-        Window = TimeSpan.FromMinutes(1),
-    }));
+        options.AddPolicy("signup", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+            }));
 
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-});
+        options.AddPolicy("login", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+            }));
+
+        options.AddPolicy("refresh", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+            }));
+
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    });
+}
 
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
@@ -151,13 +156,20 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
 app.UseHttpsRedirection();
 app.UseCors();
-app.UseRateLimiter();
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseRateLimiter();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -189,3 +201,5 @@ app.MapGet("/healthz", async (AppDbContext db) =>
 });
 
 app.Run();
+
+public partial class Program { }
