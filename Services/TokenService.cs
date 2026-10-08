@@ -20,17 +20,20 @@ public class TokenService : ITokenService
         _refreshTokenExpiryDays = int.Parse(config["Jwt:RefreshTokenExpiryDays"] ?? "30");
     }
 
-    public string CreateAccessToken(Guid userId)
+    public string CreateAccessToken(Guid userId, IList<string> roles)
     {
         var keyBytes = Encoding.UTF8.GetBytes(_secretKey);
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
-        {
-            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
-            new Claim("type", "access"),
-        };
+        var claims = new List<Claim>
+    {
+        new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
+        new Claim("type", "access"),
+    };
+
+        foreach (var role in roles)
+            claims.Add(new Claim(ClaimTypes.Role, role));
 
         var token = new JwtSecurityToken(
             claims: claims,
@@ -40,12 +43,11 @@ public class TokenService : ITokenService
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-
     public (string rawToken, string tokenHash, DateTime expiresAt) GenerateRefreshToken()
     {
         var rawBytes = RandomNumberGenerator.GetBytes(48);
         var rawToken = Convert.ToBase64String(rawBytes)
-            .Replace("+", "-").Replace("/", "_").Replace("=", ""); 
+            .Replace("+", "-").Replace("/", "_").Replace("=", "");
 
         var tokenHash = HashRefreshToken(rawToken);
         var expiresAt = DateTime.UtcNow.AddDays(_refreshTokenExpiryDays);

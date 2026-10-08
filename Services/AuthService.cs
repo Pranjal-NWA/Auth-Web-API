@@ -101,7 +101,8 @@ public class AuthService : IAuthService
             throw new ForbiddenApiException("Account is disabled");
         }
 
-        var accessToken = _tokenService.CreateAccessToken(user.Id);
+        var roles = await _userManager.GetRolesAsync(user);
+        var accessToken = _tokenService.CreateAccessToken(user.Id, roles);
         var (rawRefresh, refreshHash, expiresAt) = _tokenService.GenerateRefreshToken();
 
         _db.RefreshTokens.Add(new RefreshToken
@@ -179,7 +180,8 @@ public class AuthService : IAuthService
 
         tokenRow.IsRevoked = true;
 
-        var accessToken = _tokenService.CreateAccessToken(user.Id);
+        var roles = await _userManager.GetRolesAsync(user);
+        var accessToken = _tokenService.CreateAccessToken(user.Id, roles);
         var (newRawRefresh, newRefreshHash, newExpiresAt) = _tokenService.GenerateRefreshToken();
 
         _db.RefreshTokens.Add(new RefreshToken
