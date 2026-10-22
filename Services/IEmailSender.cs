@@ -12,13 +12,11 @@ public class DevEmailSender : IEmailSender
 
     public Task SendEmailConfirmationAsync(string toEmail, string confirmationLink)
     {
-        _logger.LogInformation("[DEV EMAIL] Confirmation link for {Email}: {Link}", toEmail, confirmationLink);
         return Task.CompletedTask;
     }
 
     public Task SendPasswordResetAsync(string toEmail, string resetLink)
     {
-        _logger.LogInformation("[DEV EMAIL] Password reset link for {Email}: {Link}", toEmail, resetLink);
         return Task.CompletedTask;
     }
 }

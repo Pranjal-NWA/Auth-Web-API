@@ -246,8 +246,6 @@ public class AuthService : IAuthService
         var result = await _userManager.ResetPasswordAsync(user, request.Token, request.NewPassword);
         if (!result.Succeeded)
             throw new ValidationApiException(result.Errors.Select(e => e.Description));
-
-        _logger.LogInformation("User {UserId} reset their password", user.Id);
     }
 
 }
