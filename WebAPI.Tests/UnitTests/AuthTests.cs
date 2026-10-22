@@ -105,7 +105,8 @@ public class AuthTests : IDisposable
         _userManager.Setup(m => m.FindByEmailAsync("user@test.com")).ReturnsAsync(user);
         _signInManager.Setup(m => m.CheckPasswordSignInAsync(user, "correct", true))
             .ReturnsAsync(SignInResult.Success);
-        _tokenService.Setup(t => t.CreateAccessToken(user.Id)).Returns("access-jwt");
+        _userManager.Setup(m => m.GetRolesAsync(user)).ReturnsAsync(new List<string> { "User" });
+        _tokenService.Setup(t => t.CreateAccessToken(user.Id, It.IsAny<IList<string>>())).Returns("access-jwt");
         _tokenService.Setup(t => t.GenerateRefreshToken()).Returns(("raw", "hash", DateTime.UtcNow.AddDays(30)));
         _userManager.Setup(m => m.UpdateAsync(user)).ReturnsAsync(IdentityResult.Success);
 
@@ -116,6 +117,11 @@ public class AuthTests : IDisposable
         Assert.Equal("raw", rawRefresh);
         Assert.NotNull(user.LastLogin);
         Assert.Single(_db.RefreshTokens);
+
+        // Confirms the user's roles actually reach the token service.
+        _tokenService.Verify(
+            t => t.CreateAccessToken(user.Id, It.Is<IList<string>>(r => r.Contains("User"))),
+            Times.Once);
     }
 
     [Fact]
@@ -185,7 +191,8 @@ public class AuthTests : IDisposable
         await _db.SaveChangesAsync();
 
         _tokenService.Setup(t => t.HashRefreshToken("raw-old")).Returns("hash-old");
-        _tokenService.Setup(t => t.CreateAccessToken(user.Id)).Returns("new-access");
+        _userManager.Setup(m => m.GetRolesAsync(user)).ReturnsAsync(new List<string> { "User" });
+        _tokenService.Setup(t => t.CreateAccessToken(user.Id, It.IsAny<IList<string>>())).Returns("new-access");
         _tokenService.Setup(t => t.GenerateRefreshToken()).Returns(("new-raw", "hash-new", DateTime.UtcNow.AddDays(30)));
         _userManager.Setup(m => m.IsLockedOutAsync(user)).ReturnsAsync(false);
 
@@ -195,6 +202,11 @@ public class AuthTests : IDisposable
         Assert.Equal("new-raw", newRaw);
         Assert.True(oldToken.IsRevoked); // old row revoked, not deleted
         Assert.Equal(2, _db.RefreshTokens.Count()); // old (revoked) + new
+
+        // Confirms the user's roles actually reach the token service.
+        _tokenService.Verify(
+            t => t.CreateAccessToken(user.Id, It.Is<IList<string>>(r => r.Contains("User"))),
+            Times.Once);
     }
 
     [Fact]

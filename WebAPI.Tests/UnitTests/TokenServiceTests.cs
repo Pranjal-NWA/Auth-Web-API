@@ -33,12 +33,30 @@ public class TokenServiceTests
         var service = MakeService();
         var userId = Guid.NewGuid();
 
-        var token = service.CreateAccessToken(userId);
+        var token = service.CreateAccessToken(userId, new List<string> { "User" });
         var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
         var parsed = handler.ReadJwtToken(token);
 
         Assert.Equal(userId.ToString(), parsed.Subject);
         Assert.True(parsed.ValidTo > DateTime.UtcNow);
+    }
+
+    [Fact]
+    public void CreateAccessToken_IncludesAllRolesInToken()
+    {
+        var service = MakeService();
+
+        var token = service.CreateAccessToken(Guid.NewGuid(), new List<string> { "Admin", "User" });
+        var parsed = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(token);
+
+        // Adjust this filter if TokenService emits the role under a different claim type.
+        var roles = parsed.Claims
+            .Where(c => c.Type == "role" || c.Type == System.Security.Claims.ClaimTypes.Role)
+            .Select(c => c.Value)
+            .ToList();
+
+        Assert.Contains("Admin", roles);
+        Assert.Contains("User", roles);
     }
 
     [Fact]
@@ -81,6 +99,7 @@ public class TokenServiceTests
 
         Assert.NotEqual(service.HashRefreshToken("a"), service.HashRefreshToken("b"));
     }
+
     [Fact]
     public void Constructor_MissingAccessTokenExpiry_UsesDefault()
     {
@@ -95,7 +114,7 @@ public class TokenServiceTests
 
         var tokenService = new TokenService(configuration);
 
-        var token = tokenService.CreateAccessToken(Guid.NewGuid());
+        var token = tokenService.CreateAccessToken(Guid.NewGuid(), new List<string> { "User" });
 
         Assert.False(string.IsNullOrWhiteSpace(token));
     }
